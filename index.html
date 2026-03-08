@@ -2,13 +2,37 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Монитор Заказов</title>
+
+    <!-- Иконки для главного экрана -->
+    <!-- Для iPhone/iPad -->
+    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/180/todo-list.png">
+    <!-- Для Android/Chrome -->
+    <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/fluency/192/todo-list.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://img.icons8.com/fluency/32/todo-list.png">
+    
+    <!-- Настройки мобильного приложения -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Заказы">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #ffffff; color: #000000; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #ffffff; 
+            color: #000000;
+            -webkit-tap-highlight-color: transparent;
+        }
         .progress-bar { transition: width 1s ease-in-out; }
+        .order-card { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen pb-24">
@@ -16,7 +40,10 @@
     <!-- Шапка -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div class="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-black tracking-tighter uppercase italic">МОНИТОР</h1>
+            <div class="flex items-center gap-2">
+                <img src="https://img.icons8.com/fluency/48/todo-list.png" class="w-6 h-6" alt="logo">
+                <h1 class="text-xl font-black tracking-tighter uppercase italic">МОНИТОР</h1>
+            </div>
             <div id="connection-status" class="flex items-center gap-2">
                 <span id="status-text" class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Поиск базы...</span>
                 <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-300"></div>
@@ -63,10 +90,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // КОНФИГУРАЦИЯ (Ваш ключ)
         const firebaseConfig = { 
             apiKey: "AIzaSyBQNdaM4gqE8gNBQm2A1XIxRlqfSjavzTw",
             authDomain: "mybusinessjournal.firebaseapp.com",
@@ -77,12 +103,9 @@
         };
 
         const MY_PHONE = "996700123456"; 
-        
-        // Список путей для сканирования (Ваш ID + системные)
         const POSSIBLE_IDS = [
             "c_927ba2c9e0e50c18_index.html-974", 
-            "business-journal-shared-996",
-            typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'
+            "business-journal-shared-996"
         ];
 
         const app = initializeApp(firebaseConfig);
@@ -94,43 +117,31 @@
 
         document.getElementById('wa-link').href = `https://wa.me/${MY_PHONE}`;
 
-        // 1. Вход
         const start = async () => {
             try {
                 await signInAnonymously(auth);
-                // Начинаем поиск по всем путям одновременно
                 POSSIBLE_IDS.forEach(id => listenToPath(id));
             } catch (e) {
-                console.error("Auth error", e);
                 document.getElementById('status-text').innerText = "Ошибка входа";
             }
         };
 
-        // 2. Слушатель пути
         function listenToPath(appId) {
             const path = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-            
             onSnapshot(path, (snap) => {
                 if (!snap.empty) {
                     activePathFound = true;
                     document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]";
-                    document.getElementById('status-text').innerText = "База найдена";
-                    
-                    // Обновляем общий список данных
+                    document.getElementById('status-text').innerText = "В СЕТИ";
                     allOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Сортировка по времени создания (если есть)
                     allOrders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                    
                     updateUI();
-                } else if (!activePathFound) {
-                    console.log(`Путь ${appId} пуст...`);
                 }
             }, (err) => {
-                console.log(`Доступ к ${appId} ограничен`);
+                console.log("Access denied for path", appId);
             });
         }
 
-        // 3. Обновление интерфейса
         function updateUI() {
             const loader = document.getElementById('loader');
             if (loader) loader.remove();
@@ -141,19 +152,15 @@
 
             document.getElementById('percent-text').innerText = pct + '%';
             document.getElementById('progress-fill').style.width = pct + '%';
-            
             renderOrders();
         }
 
-        // 4. Отрисовка списка
         function renderOrders() {
             const list = document.getElementById('order-list');
             const search = document.getElementById('search-input').value.toLowerCase().trim();
             list.innerHTML = '';
 
-            const filtered = allOrders.filter(o => 
-                (o.name || "").toLowerCase().includes(search)
-            );
+            const filtered = allOrders.filter(o => (o.name || "").toLowerCase().includes(search));
 
             if (filtered.length === 0) {
                 list.innerHTML = '<p class="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Заказов не найдено</p>';
@@ -163,11 +170,11 @@
             filtered.forEach(o => {
                 const isDone = o.status === 'Готово' || o.status === 'Выполнено';
                 const div = document.createElement('div');
-                div.className = 'bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center mb-1 transition-all';
+                div.className = 'order-card bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center';
                 div.innerHTML = `
                     <div>
                         <div class="font-black text-slate-900 italic tracking-tight uppercase text-sm">${o.name || 'КЛИЕНТ'}</div>
-                        <div class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1 italic">${o.date || 'Дата не указана'}</div>
+                        <div class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1 italic">${o.date || ''}</div>
                     </div>
                     <div class="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border ${isDone ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}">
                         ${o.status || 'В работе'}
@@ -182,4 +189,6 @@
     </script>
 </body>
 </html>
+
+
 
