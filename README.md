@@ -1,1 +1,184 @@
-# Journal
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статус заказов | Бизнес 🇰🇬</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap');
+        body { font-family: 'Manrope', sans-serif; background-color: #f8fafc; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .progress-bar { transition: width 1s ease-in-out; }
+    </style>
+</head>
+<body class="text-slate-900">
+
+    <!-- Шапка сайта -->
+    <nav class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🇰🇬</span>
+                <span class="font-black text-xl tracking-tighter uppercase italic text-emerald-700">Бизнес Монитор</span>
+            </div>
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+                Live Обновление
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4 py-8">
+        
+        <!-- Блок статистики и графика -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div class="md:col-span-2 glass-card p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50">
+                <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Общий прогресс цеха</h2>
+                <div class="flex items-end gap-4 mb-2">
+                    <span id="percent-text" class="text-6xl font-black text-emerald-600">0%</span>
+                    <span class="text-slate-400 font-bold pb-2 uppercase text-xs">заказов выполнено</span>
+                </div>
+                <div class="w-full bg-slate-200 h-4 rounded-full overflow-hidden">
+                    <div id="progress-fill" class="progress-bar bg-emerald-500 h-full w-0"></div>
+                </div>
+            </div>
+            
+            <div class="bg-emerald-700 p-8 rounded-[2.5rem] text-white shadow-xl shadow-emerald-200 flex flex-col justify-center">
+                <p class="text-emerald-200 text-xs font-bold uppercase mb-1">Сегодня в работе</p>
+                <p id="active-count" class="text-5xl font-black italic">0</p>
+                <p class="text-emerald-100/60 text-[10px] mt-4 leading-tight">Мы работаем максимально быстро, чтобы ваш заказ был готов вовремя!</p>
+            </div>
+        </div>
+
+        <!-- Поиск для клиента -->
+        <div class="mb-8 relative">
+            <input type="text" id="search-input" placeholder="Введите ваш номер телефона для проверки..." 
+                   class="w-full bg-white border-2 border-slate-200 p-5 rounded-3xl text-lg font-bold focus:border-emerald-500 focus:ring-0 transition-all shadow-sm outline-none pl-14">
+            <span class="absolute left-6 top-6 text-slate-400 italic">🔍</span>
+        </div>
+
+        <!-- Таблица заказов -->
+        <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
+                            <th class="p-6">Клиент</th>
+                            <th class="p-6">Услуга</th>
+                            <th class="p-6 text-center">Ожидаемая дата</th>
+                            <th class="p-6 text-right">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="public-table" class="divide-y divide-slate-100 text-sm">
+                        <!-- Сюда попадут данные -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer class="mt-20 pb-10 text-center text-slate-400">
+            <p class="text-[10px] font-bold uppercase tracking-[0.2em]">Система управления заказами v2.0</p>
+            <p class="text-[9px] mt-2 opacity-50">Данные защищены анонимным протоколом Firebase</p>
+        </footer>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // ВСТАВЬТЕ ВАШИ КЛЮЧИ ТУТ:
+        // ==========================================
+        const firebaseConfig = { 
+apiKey: "AIzaSyBQNdaM4gqE8gNBQm2A1XIxRlqfSjavzTw",
+  authDomain: "mybusinessjournal.firebaseapp.com",
+  projectId: "mybusinessjournal",
+  storageBucket: "mybusinessjournal.firebasestorage.app",
+  messagingSenderId: "1063822499786",
+  appId: "1:1063822499786:web:36e372f6a1f2bbec0c7933",
+  measurementId: "G-JDN6F8XNQ2"
+} ;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const journalId = typeof __app_id !== 'undefined' ? __app_id : 'business-journal-shared-996';
+
+        let allOrders = [];
+
+        signInAnonymously(auth);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                const ref = collection(db, 'artifacts', journalId, 'public', 'data', 'orders');
+                onSnapshot(ref, (snap) => {
+                    allOrders = snap.docs.map(d => d.data());
+                    allOrders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    updateStats();
+                    render();
+                });
+            }
+        });
+
+        function updateStats() {
+            const total = allOrders.length;
+            const done = allOrders.filter(o => o.status === 'Готово').length;
+            const active = total - done;
+            const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+            document.getElementById('percent-text').innerText = percent + '%';
+            document.getElementById('progress-fill').style.width = percent + '%';
+            document.getElementById('active-count').innerText = active;
+        }
+
+        function maskName(name) {
+            if(!name) return "***";
+            return name.substring(0, 1) + ".".repeat(name.length - 1);
+        }
+
+        function maskPhone(phone) {
+            if(!phone) return "";
+            // Оставляем только начало и конец: +996 700 *** 456
+            const clean = phone.replace(/\s/g, '');
+            if(clean.length < 10) return phone;
+            return clean.substring(0, 8) + "***" + clean.substring(clean.length - 2);
+        }
+
+        function render() {
+            const table = document.getElementById('public-table');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            table.innerHTML = '';
+
+            const filtered = allOrders.filter(o => 
+                o.name.toLowerCase().includes(search) || 
+                o.phone.toLowerCase().includes(search) ||
+                o.work.toLowerCase().includes(search)
+            );
+
+            filtered.forEach(o => {
+                const tr = document.createElement('tr');
+                const isDone = o.status === 'Готово';
+                
+                tr.className = `transition-all ${isDone ? 'opacity-40' : 'bg-white'}`;
+                tr.innerHTML = `
+                    <td class="p-6">
+                        <div class="flex flex-col">
+                            <span class="font-black text-slate-800">${maskName(o.name)}</span>
+                            <span class="text-[10px] font-bold text-slate-400">${maskPhone(o.phone)}</span>
+                        </div>
+                    </td>
+                    <td class="p-6 text-slate-600 font-medium">${o.work}</td>
+                    <td class="p-6 text-center font-bold text-slate-400">${o.date.split('-').reverse().join('.')}</td>
+                    <td class="p-6 text-right">
+                        <span class="px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-600 animate-pulse'}">
+                            ${isDone ? 'Завершено' : 'В работе'}
+                        </span>
+                    </td>
+                `;
+                table.appendChild(tr);
+            });
+        }
+
+        document.getElementById('search-input').addEventListener('input', render);
+    </script>
+</body>
+</html>
